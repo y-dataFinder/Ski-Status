@@ -222,19 +222,26 @@ async function saveStatus() {
         return;
     }
 
-    // Generate token for new users
+    // Check if user can modify this status FIRST (before setting name)
+    if (!currentUser && allUsers[name]) {
+        // New user trying to claim an existing name
+        alert('This name is already taken by another user');
+        return;
+    }
+
+    if (currentUser && allUsers[name] && allUsers[name].token !== userToken) {
+        // Existing user trying to modify someone else's status
+        alert('This name is already taken by another user');
+        return;
+    }
+
+    // Generate token for new users (only after validation passes)
     if (!currentUser) {
         currentUser = name;
         userToken = generateToken();
         localStorage.setItem('userName', name);
         localStorage.setItem('userToken', userToken);
         updateWelcomeMessage();
-    }
-
-    // Check if user can modify this status
-    if (allUsers[name] && allUsers[name].token !== userToken) {
-        alert('This name is already taken by another user');
-        return;
     }
 
     // Save to Firebase
