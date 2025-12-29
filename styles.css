@@ -137,6 +137,15 @@ h1 {
     letter-spacing: 1px;
 }
 
+/* Reset Notice */
+.reset-notice {
+    text-align: center;
+    font-size: 14px;
+    color: #888888;
+    letter-spacing: 1px;
+    margin-bottom: 30px;
+}
+
 /* Status Indicators */
 .status-indicator {
     width: 20px;
