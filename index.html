@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ski Status Board</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>SKI STATUS BOARD</h1>
+            <div class="user-controls">
+                <span id="welcome-message"></span>
+                <button id="change-status-btn" class="btn">Update Status</button>
+            </div>
+        </header>
+
+        <div class="legend">
+            <div class="legend-item">
+                <span class="status-indicator free"></span>
+                <span>Free Skiing</span>
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator working"></span>
+                <span>Working</span>
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator maybe"></span>
+                <span>Maybe Later</span>
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator free backcountry"></span>
+                <span>Backcountry Gear</span>
+            </div>
+        </div>
+
+        <div class="board-columns">
+            <div class="column" id="column-1"></div>
+            <div class="column" id="column-2"></div>
+        </div>
+    </div>
+
+    <!-- Modal for status update -->
+    <div id="status-modal" class="modal">
+        <div class="modal-content">
+            <h2>Update Your Status</h2>
+            <div id="name-input-section">
+                <label for="name-input">Enter your name:</label>
+                <input type="text" id="name-input" placeholder="Your name">
+            </div>
+            <div id="status-options">
+                <label>Status:</label>
+                <div class="status-options-grid">
+                    <button class="status-btn" data-status="free">
+                        <span class="status-indicator free"></span>
+                        Free Skiing
+                    </button>
+                    <button class="status-btn" data-status="working">
+                        <span class="status-indicator working"></span>
+                        Working
+                    </button>
+                    <button class="status-btn" data-status="maybe">
+                        <span class="status-indicator maybe"></span>
+                        Maybe Later
+                    </button>
+                </div>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="backcountry-checkbox">
+                    <label for="backcountry-checkbox">Backcountry Gear</label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="save-status-btn" class="btn btn-primary">Save</button>
+                <button id="cancel-btn" class="btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script src="app.js"></script>
+</body>
+</html>
