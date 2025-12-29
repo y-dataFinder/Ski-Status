@@ -12,11 +12,66 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let database;
-try {
-    firebase.initializeApp(firebaseConfig);
-    database = firebase.database();
-} catch (error) {
-    console.error("Firebase initialization error:", error);
+let firebaseInitialized = false;
+
+function initializeFirebase() {
+    try {
+        if (typeof firebase === 'undefined') {
+            throw new Error('Firebase SDK failed to load. Check your internet connection.');
+        }
+
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+        firebaseInitialized = true;
+
+        console.log('Firebase initialized successfully');
+        showConnectionStatus('Connected to Firebase', false);
+
+        // Monitor connection state
+        database.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                console.log('Firebase connected');
+                showConnectionStatus('Connected', false);
+            } else {
+                console.log('Firebase disconnected');
+                showConnectionStatus('Disconnected - Reconnecting...', true);
+            }
+        });
+
+    } catch (error) {
+        console.error("Firebase initialization error:", error);
+        showConnectionStatus('Failed to connect to Firebase: ' + error.message, true);
+        firebaseInitialized = false;
+    }
+}
+
+// Show connection status to user
+function showConnectionStatus(message, isError) {
+    console.log(`Connection status: ${message}`);
+
+    // Create or update status message element
+    let statusEl = document.getElementById('connection-status');
+    if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.id = 'connection-status';
+        statusEl.className = 'connection-status';
+        document.body.appendChild(statusEl);
+    }
+
+    statusEl.textContent = message;
+    statusEl.className = isError ? 'connection-status error' : 'connection-status success';
+
+    // Auto-hide success messages after 3 seconds
+    if (!isError) {
+        setTimeout(() => {
+            if (statusEl && statusEl.textContent === message) {
+                statusEl.style.opacity = '0';
+                setTimeout(() => {
+                    if (statusEl) statusEl.remove();
+                }, 300);
+            }
+        }, 3000);
+    }
 }
 
 // App State
@@ -40,6 +95,8 @@ const column2 = document.getElementById('column-2');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    showConnectionStatus('Initializing...', false);
+    initializeFirebase();
     loadUserFromStorage();
     setupEventListeners();
     listenToFirebaseChanges();
@@ -62,10 +119,33 @@ function loadUserFromStorage() {
     }
 }
 
-// Update welcome message
+// Update welcome message and status indicator
 function updateWelcomeMessage() {
     if (currentUser) {
         welcomeMessage.textContent = `Hello, ${currentUser}`;
+
+        // Update status indicator
+        const statusIndicator = document.getElementById('user-status-indicator');
+        if (statusIndicator && allUsers[currentUser]) {
+            const userStatus = allUsers[currentUser];
+
+            // Remove all status classes
+            statusIndicator.className = 'status-indicator';
+
+            // Add current status class
+            statusIndicator.classList.add(userStatus.status);
+
+            // Add backcountry class if applicable
+            if (userStatus.backcountry) {
+                statusIndicator.classList.add('backcountry');
+            }
+
+            // Show the indicator
+            statusIndicator.style.display = 'inline-block';
+        } else if (statusIndicator) {
+            // Hide if user hasn't set status
+            statusIndicator.style.display = 'none';
+        }
     }
 }
 
@@ -176,20 +256,47 @@ async function saveStatus() {
 
 // Listen to Firebase changes
 function listenToFirebaseChanges() {
-    if (!database) return;
+    if (!database) {
+        console.warn('Cannot listen to Firebase changes: database not initialized');
+        showConnectionStatus('Firebase not initialized', true);
+        return;
+    }
+
+    console.log('Setting up Firebase listener...');
 
     database.ref('users').on('value', (snapshot) => {
         allUsers = {};
         const data = snapshot.val();
 
+        console.log('Received Firebase data:', data);
+
         if (data) {
+            // Validate and process each user
             Object.keys(data).forEach(key => {
+                const userData = data[key];
+
+                // Validate user data structure
+                if (!userData || typeof userData !== 'object') {
+                    console.warn(`Invalid user data for key: ${key}`);
+                    return;
+                }
+
+                if (!userData.status || !userData.token) {
+                    console.warn(`Incomplete user data for key: ${key}`, userData);
+                    return;
+                }
+
                 const userName = desanitizeName(key);
-                allUsers[userName] = data[key];
+                allUsers[userName] = userData;
             });
         }
 
+        console.log(`Rendering board with ${Object.keys(allUsers).length} users`);
         renderBoard();
+    }, (error) => {
+        // Error callback
+        console.error('Firebase listener error:', error);
+        showConnectionStatus('Error loading statuses: ' + error.message, true);
     });
 }
 
@@ -199,6 +306,17 @@ function renderBoard() {
     column2.innerHTML = '';
 
     const userNames = Object.keys(allUsers).sort();
+
+    // Show empty state if no users
+    if (userNames.length === 0 && firebaseInitialized) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-state';
+        emptyMessage.textContent = 'No one is online yet. Be the first to set your status!';
+        column1.appendChild(emptyMessage);
+        updateWelcomeMessage(); // Update status indicator even when board is empty
+        return;
+    }
+
     const midpoint = Math.ceil(userNames.length / 2);
 
     userNames.forEach((name, index) => {
@@ -211,6 +329,9 @@ function renderBoard() {
             column2.appendChild(card);
         }
     });
+
+    // Update current user's status indicator after rendering board
+    updateWelcomeMessage();
 }
 
 // Create user card
@@ -260,12 +381,13 @@ function generateToken() {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
-// Sanitize name for Firebase key
+// Sanitize name for Firebase key (converts spaces and special chars to underscores)
 function sanitizeName(name) {
-    return name.replace(/[.#$\/\[\]]/g, '_');
+    // Replace spaces and Firebase-invalid characters with underscores
+    return name.replace(/[.#$\/\[\]\s]/g, '_');
 }
 
-// Desanitize name
+// Desanitize name (converts underscores back to spaces - inverse of sanitize)
 function desanitizeName(key) {
     return key.replace(/_/g, ' ');
 }
@@ -289,13 +411,26 @@ function checkDailyReset() {
 
 // Perform daily reset
 async function performDailyReset() {
-    if (!database) return;
+    if (!database) {
+        console.warn('Cannot perform daily reset: database not initialized');
+        return;
+    }
 
     try {
+        console.log('Performing daily reset...');
         // Clear all users from Firebase
         await database.ref('users').remove();
-        console.log('Daily reset completed at 4:10 PM');
+        console.log('Daily reset completed successfully');
+        showConnectionStatus('Daily status reset completed', false);
     } catch (error) {
         console.error('Error performing daily reset:', error);
+
+        // Check if it's a permission error
+        if (error.code === 'PERMISSION_DENIED') {
+            console.error('Permission denied: Update Firebase database rules to allow writes at "users" level');
+            showConnectionStatus('Daily reset failed: Permission denied. Check Firebase rules.', true);
+        } else {
+            showConnectionStatus('Daily reset failed: ' + error.message, true);
+        }
     }
 }
