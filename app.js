@@ -393,24 +393,40 @@ function desanitizeName(key) {
 }
 
 // Check daily reset at 4:10 PM
-function checkDailyReset() {
-    const lastResetDate = localStorage.getItem('lastResetDate');
+async function checkDailyReset() {
+    if (!database) return;
+
     const now = new Date();
     const currentDate = now.toDateString();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
 
-    // Check if it's past 4:10 PM and we haven't reset today
+    // Check if it's past 4:10 PM
     const isPast410PM = currentHour > 16 || (currentHour === 16 && currentMinute >= 10);
 
-    if (isPast410PM && lastResetDate !== currentDate) {
-        performDailyReset();
-        localStorage.setItem('lastResetDate', currentDate);
+    if (!isPast410PM) {
+        return; // Not time to reset yet
+    }
+
+    try {
+        // Get last reset date from Firebase (shared across all users)
+        const metadataRef = database.ref('metadata/lastResetDate');
+        const snapshot = await metadataRef.once('value');
+        const lastResetDate = snapshot.val();
+
+        console.log('Checking daily reset:', { currentDate, lastResetDate, isPast410PM });
+
+        // Only reset if we haven't reset today
+        if (lastResetDate !== currentDate) {
+            await performDailyReset(currentDate);
+        }
+    } catch (error) {
+        console.error('Error checking daily reset:', error);
     }
 }
 
 // Perform daily reset
-async function performDailyReset() {
+async function performDailyReset(currentDate) {
     if (!database) {
         console.warn('Cannot perform daily reset: database not initialized');
         return;
@@ -418,16 +434,21 @@ async function performDailyReset() {
 
     try {
         console.log('Performing daily reset...');
+
         // Clear all users from Firebase
         await database.ref('users').remove();
-        console.log('Daily reset completed successfully');
+
+        // Save the reset date to Firebase (shared across all users)
+        await database.ref('metadata/lastResetDate').set(currentDate);
+
+        console.log('Daily reset completed successfully for date:', currentDate);
         showConnectionStatus('Daily status reset completed', false);
     } catch (error) {
         console.error('Error performing daily reset:', error);
 
         // Check if it's a permission error
         if (error.code === 'PERMISSION_DENIED') {
-            console.error('Permission denied: Update Firebase database rules to allow writes at "users" level');
+            console.error('Permission denied: Update Firebase database rules to allow writes at "users" and "metadata" level');
             showConnectionStatus('Daily reset failed: Permission denied. Check Firebase rules.', true);
         } else {
             showConnectionStatus('Daily reset failed: ' + error.message, true);
