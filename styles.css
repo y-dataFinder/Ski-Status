@@ -169,6 +169,12 @@ h1 {
     border-radius: 50%;
 }
 
+/* Backcountry indicator only (no fill, just orange ring) */
+.status-indicator.backcountry-only {
+    background-color: transparent;
+    border: 3px solid #ff8800;
+}
+
 /* Board Columns */
 .board-columns {
     display: grid;

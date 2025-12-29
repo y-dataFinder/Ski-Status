@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ski Status Board</title>
+    <title>SKISTATUS</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>SKI STATUS BOARD</h1>
+            <h1>SKISTATUS</h1>
             <div class="user-controls">
                 <div class="user-info">
                     <span id="welcome-message"></span>
@@ -22,7 +22,7 @@
         <div class="legend">
             <div class="legend-item">
                 <span class="status-indicator free"></span>
-                <span>Free Skiing</span>
+                <span>Skiing</span>
             </div>
             <div class="legend-item">
                 <span class="status-indicator working"></span>
@@ -30,10 +30,10 @@
             </div>
             <div class="legend-item">
                 <span class="status-indicator maybe"></span>
-                <span>Maybe Later</span>
+                <span>Skiing Later</span>
             </div>
             <div class="legend-item">
-                <span class="status-indicator free backcountry"></span>
+                <span class="status-indicator backcountry-only"></span>
                 <span>Backcountry Gear</span>
             </div>
         </div>
@@ -57,7 +57,7 @@
                 <div class="status-options-grid">
                     <button class="status-btn" data-status="free">
                         <span class="status-indicator free"></span>
-                        Free Skiing
+                        Skiing
                     </button>
                     <button class="status-btn" data-status="working">
                         <span class="status-indicator working"></span>
@@ -65,7 +65,7 @@
                     </button>
                     <button class="status-btn" data-status="maybe">
                         <span class="status-indicator maybe"></span>
-                        Maybe Later
+                        Skiing Later
                     </button>
                 </div>
                 <div class="checkbox-option">
