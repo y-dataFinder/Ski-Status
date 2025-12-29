@@ -77,6 +77,7 @@ function showConnectionStatus(message, isError) {
 // App State
 let currentUser = null;
 let userToken = null;
+let deviceId = null;
 let selectedStatus = null;
 let allUsers = {};
 
@@ -106,16 +107,87 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(checkDailyReset, 60000);
 });
 
-// Load user from local storage
-function loadUserFromStorage() {
+// Device ID Management (persistent across localStorage clears)
+function getOrCreateDeviceId() {
+    // Try multiple storage locations (in order of persistence)
+    let storedDeviceId = getCookie('deviceId') ||
+                         localStorage.getItem('deviceId') ||
+                         sessionStorage.getItem('deviceId');
+
+    if (storedDeviceId) {
+        deviceId = storedDeviceId;
+    } else {
+        // Generate new device ID
+        deviceId = generateToken() + '_' + Date.now();
+    }
+
+    // Store in all three locations for maximum persistence
+    setCookie('deviceId', deviceId, 365); // Cookie lasts 1 year
+    localStorage.setItem('deviceId', deviceId);
+    sessionStorage.setItem('deviceId', deviceId);
+
+    return deviceId;
+}
+
+// Cookie helpers
+function setCookie(name, value, days) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+}
+
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+// Load user from local storage or Firebase (by device ID)
+async function loadUserFromStorage() {
     const storedName = localStorage.getItem('userName');
     const storedToken = localStorage.getItem('userToken');
 
+    // Get or create device ID
+    getOrCreateDeviceId();
+
     if (storedName && storedToken) {
+        // localStorage still has user data
         currentUser = storedName;
         userToken = storedToken;
         updateWelcomeMessage();
         nameInputSection.style.display = 'none';
+    } else if (database && deviceId) {
+        // localStorage was cleared, try to restore from Firebase
+        console.log('localStorage empty, checking Firebase for device ID...');
+        try {
+            const snapshot = await database.ref('users_by_device/' + deviceId).once('value');
+            const userData = snapshot.val();
+
+            if (userData && userData.name && userData.token) {
+                // Found user data, restore it
+                console.log('Restored user from Firebase:', userData.name);
+                currentUser = userData.name;
+                userToken = userData.token;
+
+                // Save back to localStorage
+                localStorage.setItem('userName', currentUser);
+                localStorage.setItem('userToken', userToken);
+
+                updateWelcomeMessage();
+                nameInputSection.style.display = 'none';
+
+                showConnectionStatus('Welcome back, ' + currentUser, false);
+            } else {
+                console.log('No previous user data found for this device');
+            }
+        } catch (error) {
+            console.error('Error restoring user from Firebase:', error);
+        }
     }
 }
 
@@ -232,9 +304,30 @@ async function saveStatus() {
     }
 
     // Check if user can modify this status
-    if (allUsers[name] && allUsers[name].token !== userToken) {
-        alert('This name is already taken by another user');
-        return;
+    // Allow if: (1) name not taken, (2) you have the token, OR (3) you have the device ID
+    if (allUsers[name]) {
+        const existingUser = allUsers[name];
+        const hasToken = existingUser.token === userToken;
+        const hasDeviceId = existingUser.deviceId === deviceId;
+
+        if (!hasToken && !hasDeviceId) {
+            // Try to check Firebase for device ID match (in case allUsers hasn't synced yet)
+            try {
+                const snapshot = await database.ref('users_by_device/' + deviceId).once('value');
+                const deviceData = snapshot.val();
+
+                if (!deviceData || deviceData.name !== name) {
+                    alert('This name is already taken by another user');
+                    return;
+                }
+                // Device ID matches, allow reclaiming
+                console.log('Reclaiming name via device ID match');
+            } catch (error) {
+                console.error('Error checking device ownership:', error);
+                alert('This name is already taken by another user');
+                return;
+            }
+        }
     }
 
     // Save to Firebase
@@ -242,11 +335,21 @@ async function saveStatus() {
         status: selectedStatus,
         backcountry: backcountryCheckbox.checked,
         token: userToken,
+        deviceId: deviceId,
         lastUpdated: Date.now()
     };
 
     try {
+        // Save user status
         await database.ref('users/' + sanitizeName(name)).set(userData);
+
+        // Save device mapping for recovery
+        await database.ref('users_by_device/' + deviceId).set({
+            name: name,
+            token: userToken
+        });
+
+        console.log('Status saved successfully with device ID');
         closeModal();
     } catch (error) {
         console.error('Error saving status:', error);
