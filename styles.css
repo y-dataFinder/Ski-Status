@@ -282,6 +282,15 @@ h1 {
     margin-bottom: 25px;
 }
 
+.name-warning {
+    font-size: 14px;
+    color: #ffff00;
+    letter-spacing: 1px;
+    margin-top: 8px;
+    margin-bottom: 0;
+    line-height: 1.4;
+}
+
 #status-options {
     margin-bottom: 25px;
 }
