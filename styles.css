@@ -165,14 +165,14 @@ h1 {
     left: -4px;
     right: -4px;
     bottom: -4px;
-    border: 3px solid #00ffff;
+    border: 3px solid #ff8800;
     border-radius: 50%;
 }
 
-/* Backcountry indicator only (no fill, just cyan ring) */
+/* Backcountry indicator only (no fill, just orange ring) */
 .status-indicator.backcountry-only {
     background-color: transparent;
-    border: 3px solid #00ffff;
+    border: 3px solid #ff8800;
 }
 
 /* Board Columns */
